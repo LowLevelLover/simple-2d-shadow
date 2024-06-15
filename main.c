@@ -33,15 +33,11 @@ void print_matrix(gsl_matrix *m) {
   }
 }
 
-int in_matrix_row(int row) {
-  return row < ROWS && row >= 0;
-}
+int in_matrix_row(int row) { return row < ROWS && row >= 0; }
 
-int in_matrix_col(int col) {
-  return col < COLS && col >= 0;
-}
+int in_matrix_col(int col) { return col < COLS && col >= 0; }
 
-circle_vector get_circle_vector(unsigned int r) {
+pixel_vector get_circle_vector(unsigned int r) {
   /*
     LEFT:
       col = colL-r
@@ -125,12 +121,66 @@ circle_vector get_circle_vector(unsigned int r) {
     current_pos++;
   }
 
-  circle_vector cv = {
-    circle,
-    current_pos,
+  pixel_vector cv = {
+      circle,
+      current_pos,
   };
 
   return cv; // SIZE: 8 * r
+}
+
+pixel_vector get_line_vector(pixel_point *target_point) {
+  int y = target_point->row;
+  int x = target_point->col;
+
+  unsigned int size = ROWS > COLS ? ROWS : COLS;
+  pixel_point *points = (pixel_point *)malloc(size * sizeof(pixel_point));
+
+  pixel_vector line_vector = {
+      points,
+      size,
+  };
+
+  if (x == INIT_LAMP_COL) {
+    int is_up = y < INIT_LAMP_ROW ? -1 : 1;
+    unsigned int current_vector_pos = 0;
+
+    for (int y_k = INIT_LAMP_ROW + is_up; in_matrix_row(y_k); y_k += is_up) {
+      points[current_vector_pos].col = INIT_LAMP_COL;
+      points[current_vector_pos].row = y_k;
+      current_vector_pos++;
+    }
+
+    line_vector.size = current_vector_pos;
+
+    return line_vector;
+  }
+
+  int is_right = x < INIT_LAMP_COL ? -1 : 1;
+  unsigned int current_vector_pos = 0;
+
+  float m = (float)(y - INIT_LAMP_ROW) / (x - INIT_LAMP_COL);
+  float b = (INIT_LAMP_ROW - m * INIT_LAMP_COL);
+
+  for (int x_k = x; in_matrix_col(x_k);
+       x_k += is_right) {
+
+    float y1 = m * x_k + b;
+
+    if (y1 != (int)y1) {
+      points[current_vector_pos].col = (int)y1 + 1;
+      points[current_vector_pos].row = x_k;
+      current_vector_pos++;
+    }
+
+    points[current_vector_pos].col = (int)y1;
+    points[current_vector_pos].row = x_k;
+    current_vector_pos++;
+  }
+
+  line_vector.size = current_vector_pos;
+
+  return line_vector;
 }
 
 int main() {

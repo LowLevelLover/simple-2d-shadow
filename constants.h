@@ -17,7 +17,7 @@ typedef struct {
 typedef struct {
   pixel_point *data;
   unsigned int size;
-} circle_vector;
+} pixel_vector;
 
 typedef enum {
   Empty,
