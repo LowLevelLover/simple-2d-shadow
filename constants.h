@@ -14,6 +14,11 @@ typedef struct {
   unsigned int col;
 } pixel_point;
 
+typedef struct {
+  pixel_point *data;
+  unsigned int size;
+} circle_vector;
+
 typedef enum {
   Empty,
   Lamp,
