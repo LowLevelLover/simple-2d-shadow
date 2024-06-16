@@ -1,7 +1,9 @@
 #include "constants.h"
 #include <gsl/gsl_matrix_double.h>
+#include <gsl/gsl_matrix_short.h>
 #include <math.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 static const pixel_point block_cells[] = {
     {2, 1}, {3, 1}, {2, 2}, {3, 2}, {1, 4},
@@ -39,7 +41,7 @@ int in_matrix_row(int row) { return row < ROWS && row >= 0; }
 
 int in_matrix_col(int col) { return col < COLS && col >= 0; }
 
-pixel_vector get_circle_vector(unsigned int r) {
+pixel_vector get_circle_vector(pixel_point center_point, unsigned int r) {
   /*
     LEFT:
       col = colL-r
@@ -68,58 +70,58 @@ pixel_vector get_circle_vector(unsigned int r) {
   pixel_point *circle = (pixel_point *)malloc(8 * r * sizeof(pixel_point));
 
   for (unsigned int i = 0; i < left_length; i++) {
-    if (!in_matrix_row(INIT_LAMP_ROW - r + i)) {
+    if (!in_matrix_row(center_point.row - r + i)) {
       continue;
     }
 
-    if (!in_matrix_col(INIT_LAMP_COL - r)) {
+    if (!in_matrix_col(center_point.col - r)) {
       break;
     }
 
-    circle[current_pos].row = INIT_LAMP_ROW - r + i;
-    circle[current_pos].col = INIT_LAMP_COL - r;
+    circle[current_pos].row = center_point.row - r + i;
+    circle[current_pos].col = center_point.col - r;
     current_pos++;
   }
 
   for (unsigned int i = 0; i < top_length; i++) {
-    if (!in_matrix_row(INIT_LAMP_ROW - r)) {
+    if (!in_matrix_row(center_point.row - r)) {
       break;
     }
 
-    if (!in_matrix_col(INIT_LAMP_COL - r + i + 1)) {
+    if (!in_matrix_col(center_point.col - r + i + 1)) {
       continue;
     }
 
-    circle[current_pos].row = INIT_LAMP_ROW - r;
-    circle[current_pos].col = INIT_LAMP_COL - r + i + 1;
+    circle[current_pos].row = center_point.row - r;
+    circle[current_pos].col = center_point.col - r + i + 1;
     current_pos++;
   }
 
   for (unsigned int i = 0; i < right_length; i++) {
-    if (!in_matrix_row(INIT_LAMP_ROW - r + i + 1)) {
+    if (!in_matrix_row(center_point.row - r + i + 1)) {
       continue;
     }
 
-    if (!in_matrix_col(INIT_LAMP_COL + r)) {
+    if (!in_matrix_col(center_point.col + r)) {
       break;
     }
 
-    circle[current_pos].row = INIT_LAMP_ROW - r + i + 1;
-    circle[current_pos].col = INIT_LAMP_COL + r;
+    circle[current_pos].row = center_point.row - r + i + 1;
+    circle[current_pos].col = center_point.col + r;
     current_pos++;
   }
 
   for (unsigned int i = 0; i < bottom_length; i++) {
-    if (!in_matrix_row(INIT_LAMP_ROW + r)) {
+    if (!in_matrix_row(center_point.row + r)) {
       break;
     }
 
-    if (!in_matrix_col(INIT_LAMP_COL - r + i + 1)) {
+    if (!in_matrix_col(center_point.col - r + i + 1)) {
       continue;
     }
 
-    circle[current_pos].row = INIT_LAMP_ROW + r;
-    circle[current_pos].col = INIT_LAMP_COL - r + i + 1;
+    circle[current_pos].row = center_point.row + r;
+    circle[current_pos].col = center_point.col - r + i + 1;
     current_pos++;
   }
 
@@ -171,22 +173,25 @@ pixel_vector get_line_vector(pixel_point *target_point) {
   float m = (float)(yp - INIT_LAMP_ROW) / (xp - INIT_LAMP_COL);
   float b = (INIT_LAMP_ROW - m * INIT_LAMP_COL);
 
-  for (int x_k = INIT_LAMP_COL + is_right; in_matrix_col(x_k); x_k += is_right) {
+  for (int x_k = INIT_LAMP_COL + is_right; in_matrix_col(x_k);
+       x_k += is_right) {
 
-    float y1 = m * x_k + b;
+    float y = m * x_k + b;
+    float y1 = y > 0 ? floor(y) : ceil(y);
+    float y2 = y > 0 ? ceil(y) : floor(y);
 
-    if (!in_matrix_row(floor(y1))) {
+    if (!in_matrix_row(y1)) {
       break;
     }
 
-    if (ceil(y1) != floor(y1) && in_matrix_row(ceil(y1))) {
+    if (ceil(y) != floor(y) && in_matrix_row(y2)) {
       points[current_vector_pos].col = x_k;
-      points[current_vector_pos].row = ceil(y1);
+      points[current_vector_pos].row = y2;
       current_vector_pos++;
     }
 
     points[current_vector_pos].col = x_k;
-    points[current_vector_pos].row = floor(y1);
+    points[current_vector_pos].row = y1;
     current_vector_pos++;
   }
 
@@ -220,7 +225,8 @@ void set_brightness(gsl_matrix *m) {
   unsigned int longest_r = get_longest_radius();
 
   for (unsigned int r = 1; r <= longest_r; r++) {
-    pixel_vector cv = get_circle_vector(r);
+    pixel_point light_point = {INIT_LAMP_ROW, INIT_LAMP_COL};
+    pixel_vector cv = get_circle_vector(light_point, r);
 
     for (unsigned int i = 0; i < cv.size; i++) {
       pixel_vector lv = get_line_vector(&cv.data[i]);
@@ -267,6 +273,33 @@ void set_brightness(gsl_matrix *m) {
   }
 }
 
+gsl_matrix *get_expanded_shadow_matrix(gsl_matrix *m) {
+  gsl_matrix *m2 = gsl_matrix_alloc(ROWS, COLS);
+  gsl_matrix_memcpy(m2, m);
+
+  pixel_point *shadows = malloc(COLS * ROWS * sizeof(pixel_point));
+  unsigned int shadow_counter = 0;
+
+  for (int row = 0; row < ROWS; row++) {
+    for (int col = 0; col < COLS; col++) {
+      if (gsl_matrix_get(m, row, col) == Shadow) {
+        pixel_point current_point = {row, col};
+        pixel_vector shadow_cricle = get_circle_vector(current_point, 1);
+
+        for (int i = 0; i < shadow_cricle.size; i++) {
+          if (gsl_matrix_get(m, shadow_cricle.data[i].row,
+                             shadow_cricle.data[i].col) == Light) {
+            gsl_matrix_set(m2, shadow_cricle.data[i].row,
+                           shadow_cricle.data[i].col, Shadow);
+          }
+        }
+      }
+    }
+  }
+
+  return m2;
+}
+
 int main() {
   gsl_matrix *m = init_matrix();
 
@@ -277,6 +310,10 @@ int main() {
   set_brightness(m);
   print_matrix(m);
 
+  gsl_matrix *m2 = get_expanded_shadow_matrix(m);
+  print_matrix(m2);
+
   gsl_matrix_free(m);
+  gsl_matrix_free(m2);
   return 0;
 }
