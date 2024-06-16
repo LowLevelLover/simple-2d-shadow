@@ -31,7 +31,7 @@ void print_matrix(gsl_matrix *m) {
   printf("\n");
   for (int x = 0; x < ROWS; x++) {
     for (int y = 0; y < COLS; y++) {
-      printf(" %.0f ", gsl_matrix_get(m, x, y));
+      printf(" %.2f ", gsl_matrix_get(m, x, y));
     }
     printf("\n");
   }
@@ -300,6 +300,40 @@ gsl_matrix *get_expanded_shadow_matrix(gsl_matrix *m) {
   return m2;
 }
 
+gsl_matrix *get_smooth_shadow_matrix(gsl_matrix *m) {
+  gsl_matrix *m2 = gsl_matrix_alloc(ROWS, COLS);
+  gsl_matrix_memcpy(m2, m);
+
+  pixel_point *shadows = malloc(COLS * ROWS * sizeof(pixel_point));
+  unsigned int shadow_counter = 0;
+
+  for (int row = 0; row < ROWS; row++) {
+    for (int col = 0; col < COLS; col++) {
+      if (gsl_matrix_get(m, row, col) == Shadow) {
+        pixel_point current_point = {row, col};
+        pixel_vector shadow_cricle = get_circle_vector(current_point, 1);
+        unsigned int light_pixels = 0;
+        unsigned int all_pixels = 0;
+
+        for (int i = 0; i < shadow_cricle.size; i++) {
+          if (gsl_matrix_get(m, shadow_cricle.data[i].row,
+                             shadow_cricle.data[i].col) != SeenBlock) {
+            all_pixels++;
+          }
+          if (gsl_matrix_get(m, shadow_cricle.data[i].row,
+                             shadow_cricle.data[i].col) == Light) {
+            light_pixels++;
+          }
+        }
+
+        gsl_matrix_set(m2, row, col, (double)light_pixels / all_pixels);
+      }
+    }
+  }
+
+  return m2;
+}
+
 int main() {
   gsl_matrix *m = init_matrix();
 
@@ -313,7 +347,11 @@ int main() {
   gsl_matrix *m2 = get_expanded_shadow_matrix(m);
   print_matrix(m2);
 
+  gsl_matrix *m3 = get_smooth_shadow_matrix(m2);
+  print_matrix(m3);
+
   gsl_matrix_free(m);
   gsl_matrix_free(m2);
+  gsl_matrix_free(m3);
   return 0;
 }
