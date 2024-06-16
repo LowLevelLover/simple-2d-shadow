@@ -1,9 +1,8 @@
 #include "constants.h"
-#include <gsl/gsl_matrix_double.h>
-#include <gsl/gsl_matrix_short.h>
-#include <math.h>
-#include <stdio.h>
-#include <stdlib.h>
+
+SDL_Window *window;
+SDL_Renderer *renderer;
+SDL_Event event;
 
 static const pixel_point block_cells[] = {
     {2, 1}, {3, 1}, {2, 2}, {3, 2}, {1, 4},
@@ -334,6 +333,61 @@ gsl_matrix *get_smooth_shadow_matrix(gsl_matrix *m) {
   return m2;
 }
 
+void sdl_error_logger(const char *msg) {
+  fprintf(stderr, "\nError: %s\n", msg);
+  fprintf(stderr, "SDL Error: %s\n", SDL_GetError());
+}
+
+int init_sdl() {
+  if (SDL_Init(SDL_INIT_EVERYTHING) != 0) {
+    sdl_error_logger("SDL initialization failed");
+    return 1;
+  }
+
+  if (SDL_CreateWindowAndRenderer(WIDTH, HEIGHT, SDL_WINDOW_FOREIGN, &window,
+                                  &renderer) != 0) {
+
+    sdl_error_logger("Window and renderer initialization failed");
+    return 1;
+  }
+
+  return 0;
+}
+
+void destroy_sdl() {
+  SDL_DestroyRenderer(renderer);
+  SDL_DestroyWindow(window);
+  SDL_Quit();
+}
+
+void draw() { SDL_RenderPresent(renderer); }
+
+void process_input() {
+  int close = FALSE;
+
+  while (!close) {
+    draw();
+    while (SDL_PollEvent(&event)) {
+      switch (event.type) {
+
+      case SDL_QUIT:
+        close = TRUE;
+        break;
+
+      case SDL_KEYDOWN:
+        switch (event.key.keysym.scancode) {
+        case SDL_SCANCODE_ESCAPE:
+          close = TRUE;
+          break;
+        default:
+          break;
+        }
+        break;
+      }
+    }
+  }
+}
+
 int main() {
   gsl_matrix *m = init_matrix();
 
@@ -350,8 +404,17 @@ int main() {
   gsl_matrix *m3 = get_smooth_shadow_matrix(m2);
   print_matrix(m3);
 
+  // SDL START HERE
+  if (init_sdl() != 0) {
+    return 1;
+  };
+
+  process_input();
+
   gsl_matrix_free(m);
   gsl_matrix_free(m2);
   gsl_matrix_free(m3);
+
+  destroy_sdl();
   return 0;
 }
