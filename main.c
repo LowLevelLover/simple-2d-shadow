@@ -138,7 +138,7 @@ pixel_vector get_line_vector_vertical(pixel_point *target_point) {
   int is_up = y < INIT_LAMP_ROW ? -1 : 1;
 
   unsigned int current_vector_pos = 0;
-  unsigned int size = ROWS > COLS ? ROWS : COLS;
+  unsigned int size = ROWS;
 
   pixel_point *points = (pixel_point *)malloc(size * sizeof(pixel_point));
 
@@ -164,7 +164,7 @@ pixel_vector get_line_vector(pixel_point *target_point) {
     return get_line_vector_vertical(target_point);
 
   unsigned int size = ROWS > COLS ? ROWS : COLS;
-  pixel_point *points = (pixel_point *)malloc(2 * size * sizeof(pixel_point));
+  pixel_point *points = (pixel_point *)malloc(size * sizeof(pixel_point));
 
   int is_right = xp < INIT_LAMP_COL ? -1 : 1;
   unsigned int current_vector_pos = 0;
@@ -175,22 +175,14 @@ pixel_vector get_line_vector(pixel_point *target_point) {
   for (int x_k = INIT_LAMP_COL + is_right; in_matrix_col(x_k);
        x_k += is_right) {
 
-    float y = m * x_k + b;
-    float y1 = y > 0 ? floor(y) : ceil(y);
-    float y2 = y > 0 ? ceil(y) : floor(y);
+    float y = round(m * x_k + b);
 
-    if (!in_matrix_row(y1)) {
+    if (!in_matrix_row(y)) {
       break;
     }
 
-    if (ceil(y) != floor(y) && in_matrix_row(y2)) {
-      points[current_vector_pos].col = x_k;
-      points[current_vector_pos].row = y2;
-      current_vector_pos++;
-    }
-
     points[current_vector_pos].col = x_k;
-    points[current_vector_pos].row = y1;
+    points[current_vector_pos].row = y;
     current_vector_pos++;
   }
 
