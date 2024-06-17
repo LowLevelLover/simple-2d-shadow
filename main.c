@@ -1,4 +1,5 @@
 #include "constants.h"
+#include <stdlib.h>
 
 SDL_Window *window;
 SDL_Renderer *renderer;
@@ -143,20 +144,63 @@ pixel_vector get_circle_vector(pixel_point *center_point, int r) {
   return cv; // SIZE: 8 * r
 }
 
-pixel_vector get_line_vector_vertical(pixel_point *target_point) {
-  int y = target_point->row;
-
-  int is_up = y < lamp_row ? -1 : 1;
+pixel_vector get_bigger_m_line_vector(float m, float b, pixel_point *target_point) {
+  int yp = target_point->row;
+  int direction = yp < lamp_row ? -1 : 1;
 
   int current_vector_pos = 0;
   int size = ROWS;
 
   pixel_point **points = malloc(size * sizeof(pixel_point *));
 
-  for (int y_k = lamp_row + is_up; in_matrix_row(y_k); y_k += is_up) {
+  for (int y_k = yp; in_matrix_row(y_k); y_k += direction) {
+    int x = round(((float)y_k - b) / m);
+
+    if (target_point->col == lamp_col){
+      x = lamp_col;
+    }
+
+    if (!in_matrix_col(x)) {
+      break;
+    }
+
     points[current_vector_pos] = malloc(sizeof(pixel_point));
-    points[current_vector_pos]->col = lamp_col;
+    points[current_vector_pos]->col = x;
     points[current_vector_pos]->row = y_k;
+    current_vector_pos++;
+  }
+
+  pixel_point **result = malloc(current_vector_pos * sizeof(pixel_point *));
+
+  pixel_vector line_vector = {
+      memcpy(result, points, current_vector_pos * sizeof(pixel_point *)),
+      current_vector_pos,
+  };
+
+  free(points);
+
+  return line_vector;
+}
+
+pixel_vector get_smaller_m_line_vector(float m, float b, pixel_point *target_point) {
+  int xp = target_point->col;
+  int direction = xp < lamp_col ? -1 : 1;
+
+  int current_vector_pos = 0;
+  int size = COLS;
+
+  pixel_point **points = malloc(size * sizeof(pixel_point *));
+
+  for (int x_k = xp; in_matrix_col(x_k); x_k += direction) {
+    int y = round(m * (float)x_k + b);
+
+    if (!in_matrix_row(y)) {
+      break;
+    }
+
+    points[current_vector_pos] = malloc(sizeof(pixel_point));
+    points[current_vector_pos]->col = x_k;
+    points[current_vector_pos]->row = y;
     current_vector_pos++;
   }
 
@@ -176,42 +220,19 @@ pixel_vector get_line_vector(pixel_point *target_point) {
   int yp = target_point->row;
   int xp = target_point->col;
 
-  if (xp == lamp_col)
-    return get_line_vector_vertical(target_point);
-
-  int size = COLS;
-  pixel_point **points = malloc(size * sizeof(pixel_point *));
-
-  int direction = xp < lamp_col ? -1 : 1;
-  int current_vector_pos = 0;
-
   float m = (float)(yp - lamp_row) / (float)(xp - lamp_col);
   float b = ((float)lamp_row - m * (float)lamp_col);
 
-  for (int x = xp; in_matrix_col(x); x += direction) {
+  pixel_vector (*line_vector_f[2])(float, float , pixel_point *) = {get_smaller_m_line_vector,
+                                        get_bigger_m_line_vector};
 
-    int y = round(m * x + b);
+  return line_vector_f[fabs(m) > 1.0](m, b, target_point);
 
-    if (!in_matrix_row(y)) {
-      break;
-    }
-
-    points[current_vector_pos] = malloc(sizeof(pixel_point));
-    points[current_vector_pos]->col = x;
-    points[current_vector_pos]->row = y;
-    current_vector_pos++;
-  }
-
-  pixel_point **result = malloc(current_vector_pos * sizeof(pixel_point *));
-
-  pixel_vector line_vector = {
-      memcpy(result, points, current_vector_pos * sizeof(pixel_point *)),
-      current_vector_pos,
-  };
-
-  free(points);
-
-  return line_vector;
+  // if (fabs(m) > 1.0) {
+  //   return get_bigger_m_line_vector(m, b, target_point);
+  // }else{
+  //   return get_bigger_m_line_vector(m, b, target_point);
+  // }
 }
 
 int get_longest_radius() {
@@ -270,7 +291,8 @@ void apply_brightness_logic(gsl_matrix *m, pixel_vector *lv,
       }
     }
   }
-  free(lv->data[lv->size - 1]);
+  if(lv->size>=1)
+    free(lv->data[lv->size - 1]);
 }
 
 void set_brightness(gsl_matrix *m) {
@@ -295,32 +317,6 @@ void set_brightness(gsl_matrix *m) {
 
     free(cv.data);
   }
-}
-
-gsl_matrix *get_expanded_shadow_matrix(gsl_matrix *m) {
-  gsl_matrix *m2 = gsl_matrix_alloc(ROWS, COLS);
-  gsl_matrix_memcpy(m2, m);
-
-  for (int row = 0; row < ROWS; row++) {
-    for (int col = 0; col < COLS; col++) {
-      if (gsl_matrix_get(m, row, col) == Shadow) {
-        pixel_point current_point = {row, col};
-        pixel_vector shadow_cricle = get_circle_vector(&current_point, 1);
-
-        for (int i = 0; i < shadow_cricle.size; i++) {
-          if (gsl_matrix_get(m, shadow_cricle.data[i]->row,
-                             shadow_cricle.data[i]->col) == Light) {
-            gsl_matrix_set(m2, shadow_cricle.data[i]->row,
-                           shadow_cricle.data[i]->col, Shadow);
-          }
-          free(shadow_cricle.data[i]);
-        }
-        free(shadow_cricle.data);
-      }
-    }
-  }
-
-  return m2;
 }
 
 gsl_matrix *get_smooth_shadow_matrix(gsl_matrix *m) {
@@ -449,20 +445,17 @@ int main() {
 
   set_brightness(m);
 
-  gsl_matrix *m2 = get_expanded_shadow_matrix(m);
+  gsl_matrix *m2 = get_smooth_shadow_matrix(m);
   gsl_matrix_free(m);
-
-  gsl_matrix *m3 = get_smooth_shadow_matrix(m2);
-  gsl_matrix_free(m2);
 
   // SDL START HERE
   if (init_sdl() != 0) {
     return 1;
   };
 
-  process_input(m3);
+  process_input(m2);
 
-  gsl_matrix_free(m3);
+  gsl_matrix_free(m2);
   destroy_sdl();
   return 0;
 }

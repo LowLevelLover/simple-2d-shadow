@@ -10,10 +10,10 @@
 #define TRUE 1
 #define FALSE 0
 
-#define ROWS 20
-#define COLS 20
+#define ROWS 200
+#define COLS 200
 
-#define SCALE_FACTOR 30
+#define SCALE_FACTOR 5
 
 #define WIDTH COLS *SCALE_FACTOR
 #define HEIGHT ROWS *SCALE_FACTOR
