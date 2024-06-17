@@ -144,7 +144,8 @@ pixel_vector get_circle_vector(pixel_point *center_point, int r) {
   return cv; // SIZE: 8 * r
 }
 
-pixel_vector get_bigger_m_line_vector(float m, float b, pixel_point *target_point) {
+pixel_vector get_bigger_m_line_vector(float m, float b,
+                                      pixel_point *target_point) {
   int yp = target_point->row;
   int direction = yp < lamp_row ? -1 : 1;
 
@@ -156,7 +157,7 @@ pixel_vector get_bigger_m_line_vector(float m, float b, pixel_point *target_poin
   for (int y_k = yp; in_matrix_row(y_k); y_k += direction) {
     int x = round(((float)y_k - b) / m);
 
-    if (target_point->col == lamp_col){
+    if (target_point->col == lamp_col) {
       x = lamp_col;
     }
 
@@ -182,7 +183,8 @@ pixel_vector get_bigger_m_line_vector(float m, float b, pixel_point *target_poin
   return line_vector;
 }
 
-pixel_vector get_smaller_m_line_vector(float m, float b, pixel_point *target_point) {
+pixel_vector get_smaller_m_line_vector(float m, float b,
+                                       pixel_point *target_point) {
   int xp = target_point->col;
   int direction = xp < lamp_col ? -1 : 1;
 
@@ -223,8 +225,8 @@ pixel_vector get_line_vector(pixel_point *target_point) {
   float m = (float)(yp - lamp_row) / (float)(xp - lamp_col);
   float b = ((float)lamp_row - m * (float)lamp_col);
 
-  pixel_vector (*line_vector_f[2])(float, float , pixel_point *) = {get_smaller_m_line_vector,
-                                        get_bigger_m_line_vector};
+  pixel_vector (*line_vector_f[2])(float, float, pixel_point *) = {
+      get_smaller_m_line_vector, get_bigger_m_line_vector};
 
   return line_vector_f[fabs(m) > 1.0](m, b, target_point);
 
@@ -291,7 +293,7 @@ void apply_brightness_logic(gsl_matrix *m, pixel_vector *lv,
       }
     }
   }
-  if(lv->size>=1)
+  if (lv->size >= 1)
     free(lv->data[lv->size - 1]);
 }
 
@@ -316,6 +318,29 @@ void set_brightness(gsl_matrix *m) {
     }
 
     free(cv.data);
+  }
+}
+
+void remove_single_light_points(gsl_matrix *m) {
+  for (int row = 0; row < ROWS; row++) {
+    for (int col = 0; col < COLS; col++) {
+      if (gsl_matrix_get(m, row, col) == Light) {
+        int is_single = TRUE;
+        pixel_point tp = {row, col};
+        pixel_vector cv = get_circle_vector(&tp, 1);
+        for (int i = 0; i < cv.size; i++) {
+          if (gsl_matrix_get(m, cv.data[i]->row, cv.data[i]->col) == Light) {
+            is_single = FALSE;
+            break;
+          }
+        }
+        if (is_single) {
+          gsl_matrix_set(m, row, col, Shadow);
+        }
+
+        free(cv.data);
+      }
+    }
   }
 }
 
@@ -442,8 +467,9 @@ void process_input(gsl_matrix *m) {
 
 int main() {
   gsl_matrix *m = init_matrix();
-
   set_brightness(m);
+
+  remove_single_light_points(m);
 
   gsl_matrix *m2 = get_smooth_shadow_matrix(m);
   gsl_matrix_free(m);
