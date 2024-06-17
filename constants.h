@@ -5,14 +5,15 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 
 #define TRUE 1
 #define FALSE 0
 
-#define ROWS 100
-#define COLS 100
+#define ROWS 20
+#define COLS 20
 
-#define SCALE_FACTOR 8
+#define SCALE_FACTOR 30
 
 #define WIDTH COLS *SCALE_FACTOR
 #define HEIGHT ROWS *SCALE_FACTOR
@@ -23,7 +24,7 @@ typedef struct {
 } pixel_point;
 
 typedef struct {
-  pixel_point *data;
+  pixel_point **data;
   int size;
 } pixel_vector;
 
