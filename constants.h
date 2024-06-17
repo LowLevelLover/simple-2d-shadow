@@ -18,6 +18,8 @@
 #define WIDTH COLS *SCALE_FACTOR
 #define HEIGHT ROWS *SCALE_FACTOR
 
+#define MAX_LAMP_RANGE 255
+
 typedef struct {
   int row;
   int col;

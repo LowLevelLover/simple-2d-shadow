@@ -229,12 +229,6 @@ pixel_vector get_line_vector(pixel_point *target_point) {
       get_smaller_m_line_vector, get_bigger_m_line_vector};
 
   return line_vector_f[fabs(m) > 1.0](m, b, target_point);
-
-  // if (fabs(m) > 1.0) {
-  //   return get_bigger_m_line_vector(m, b, target_point);
-  // }else{
-  //   return get_bigger_m_line_vector(m, b, target_point);
-  // }
 }
 
 int get_longest_radius() {
@@ -321,6 +315,30 @@ void set_brightness(gsl_matrix *m) {
   }
 }
 
+float distance(pixel_point *target_point) {
+  int dx = abs(target_point->col - lamp_col);
+  int dy = abs(target_point->row - lamp_row);
+
+  return sqrt(pow(dy, 2) + pow(dx, 2));
+}
+
+int in_lamp_range(pixel_point *target_point) {
+  return distance(target_point) <= MAX_LAMP_RANGE;
+}
+
+void adjust_brightness(gsl_matrix *m, pixel_point *tp) {
+  int row = tp->row;
+  int col = tp->col;
+
+  if (gsl_matrix_get(m, row, col) == Light) {
+    if (!in_lamp_range(tp)) {
+      gsl_matrix_set(m, row, col, Shadow);
+    } else {
+      gsl_matrix_set(m, row, col, 1 - (distance(tp) / MAX_LAMP_RANGE));
+    }
+  }
+}
+
 void remove_single_light_points(gsl_matrix *m) {
   for (int row = 0; row < ROWS; row++) {
     for (int col = 0; col < COLS; col++) {
@@ -328,15 +346,19 @@ void remove_single_light_points(gsl_matrix *m) {
         int is_single = TRUE;
         pixel_point tp = {row, col};
         pixel_vector cv = get_circle_vector(&tp, 1);
+
         for (int i = 0; i < cv.size; i++) {
           if (gsl_matrix_get(m, cv.data[i]->row, cv.data[i]->col) == Light) {
             is_single = FALSE;
             break;
           }
         }
+
         if (is_single) {
           gsl_matrix_set(m, row, col, Shadow);
         }
+
+        adjust_brightness(m, &tp);
 
         free(cv.data);
       }
