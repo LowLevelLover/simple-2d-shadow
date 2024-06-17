@@ -19,6 +19,7 @@
 #define HEIGHT ROWS *SCALE_FACTOR
 
 #define MAX_LAMP_RANGE 255
+#define MAX_RECT_COUNT 5
 
 typedef struct {
   int row;
